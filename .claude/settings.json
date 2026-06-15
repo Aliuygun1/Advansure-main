@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(DATABASE_URL_UNPOOLED=\"postgresql://postgres.juegokmzvomliezrohtg:Advansure090626@aws-0-eu-west-1.pooler.supabase.com:5432/postgres\" npx drizzle-kit push --config=drizzle.config.ts)",
+      "Bash(DATABASE_URL=\"postgresql://postgres.juegokmzvomliezrohtg:Advansure090626@aws-0-eu-west-1.pooler.supabase.com:5432/postgres\" npx tsx src/lib/db/seed.ts)",
+      "Bash(curl -s -X POST https://juegokmzvomliezrohtg.supabase.co/storage/v1/bucket -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp1ZWdva216dm9tbGllenJvaHRnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDk2MzgwNSwiZXhwIjoyMDk2NTM5ODA1fQ.X_zN07g90nrAWwVYH_fyWy9nTzV0J3FdkU_aKeTztBY' -H 'Content-Type: application/json' -d '{\"id\":\"walks\",\"name\":\"walks\",\"public\":false,\"fileSizeLimit\":52428800}')",
+      "Bash(curl -s -X POST http://localhost:3000/api/session -H 'Content-Type: application/json' -d '{\"personaId\":\"leon\"}')",
+      "Bash(curl -s -X POST http://localhost:3000/api/avery/message -H 'Content-Type: application/json' -d '{\"personaId\":\"leon\",\"message\":\"Wasserschaden durch die Waschmaschine in der Küche\"}')",
+      "Bash(curl -s -X POST http://localhost:3000/api/avery/message -H 'Content-Type: application/json' -d '{\"personaId\":\"leon\",\"message\":\"Wasserschaden in der Küche\"}')",
+      "Bash(curl -s -X POST http://localhost:3000/api/avery/message -H 'Content-Type: application/json' -d '{\"personaId\":\"leon\",\"message\":\"Wasserschaden\"}')",
+      "Bash(curl -s -X POST http://localhost:3000/api/avery/message -H 'Content-Type: application/json' -d '{\"personaId\":\"leon\",\"message\":\"Wasserschaden Küche\"}')",
+      "Bash(curl -s -X POST \"http://localhost:3000/api/avery/message\" -H \"Content-Type: application/json\" -d '{\"personaId\":\"leon\",\"message\":\"Wasserschaden Küche\"}')"
+    ]
+  }
+}
