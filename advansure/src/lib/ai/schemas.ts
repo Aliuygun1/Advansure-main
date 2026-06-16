@@ -92,7 +92,7 @@ export const RoomAnalysisSchema = z.object({
   ]),
   user_message: z.string().min(1),
   /** Concrete instruction to the user for the next video clip (TU-04) */
-  next_request: z.string().min(1).optional(),
+  next_request: z.string().nullish().transform((v) => (v && v.trim().length > 0 ? v.trim() : undefined)),
   /** Optional chain-of-thought from the model; stored for audit */
   ai_reasoning: z.string().optional(),
 });

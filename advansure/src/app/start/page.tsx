@@ -80,6 +80,10 @@ export default function StartPage() {
 
   function startClaim() {
     sessionStorage.setItem("adv-persona", personaId);
+    sessionStorage.removeItem("adv-chat-messages");
+    sessionStorage.removeItem("adv-chat-conv-id");
+    sessionStorage.removeItem("adv-damage");
+    sessionStorage.removeItem("adv-walk-id");
     router.push("/chat");
   }
 

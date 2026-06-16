@@ -52,8 +52,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json({ walkId: walk.id }, { status: 201 });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Walk konnte nicht erstellt werden';
-    console.error('[walk/create]', message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error('[walk/create] DB error for persona', personaId, ':', err);
+    return NextResponse.json({ error: 'Walk konnte nicht erstellt werden' }, { status: 500 });
   }
 }
