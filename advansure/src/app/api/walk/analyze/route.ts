@@ -218,6 +218,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     // back to a heuristic estimate from the known damage context so the walk
     // never dead-ends with a 502.
     let analysis: RoomAnalysis;
+    let usedFallback = false;
     try {
       const rawResponse = await callGeminiWithRetry(input, existingRoomTypes);
       console.log('[analyze] Raw Gemini response for walk', walkId, ':', rawResponse);
@@ -231,6 +232,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           analysisResult.error,
         );
         analysis = buildSmartRoomAnalysis(input.damageContext, existingRoomTypes, input.iteration);
+        usedFallback = true;
       }
     } catch (err) {
       const detail = err instanceof Error ? err.message : 'Gemini error';
@@ -238,6 +240,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         '[analyze] Gemini unavailable for walk', walkId, '— using smart fallback:', detail,
       );
       analysis = buildSmartRoomAnalysis(input.damageContext, existingRoomTypes, input.iteration);
+      usedFallback = true;
     }
 
     // Calculate valuation
@@ -313,6 +316,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         satisfied: analysis.satisfied,
         nextRequest: analysis.next_request ?? null,
         userMessage: analysis.user_message,
+        // True when the AI analysis was unavailable and a manual-review
+        // fallback was used — the UI surfaces this transparently to the user.
+        fallback: usedFallback,
       },
       { status: 200 },
     );

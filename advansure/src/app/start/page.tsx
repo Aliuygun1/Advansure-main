@@ -84,6 +84,7 @@ export default function StartPage() {
     sessionStorage.removeItem("adv-chat-conv-id");
     sessionStorage.removeItem("adv-damage");
     sessionStorage.removeItem("adv-walk-id");
+    sessionStorage.removeItem("adv-ai-fallback");
     router.push("/chat");
   }
 

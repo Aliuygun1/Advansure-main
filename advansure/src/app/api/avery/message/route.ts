@@ -27,7 +27,7 @@ const RequestSchema = z.object({
 // ---------------------------------------------------------------------------
 
 const FALLBACK_MESSAGE =
-  'Entschuldige, ich hatte kurz einen Denkfehler. Kannst du das nochmal beschreiben?';
+  'Entschuldige, meine KI-Analyse ist derzeit vorübergehend nicht verfügbar. Bitte filme den Schaden trotzdem – die Schadensmeldung wird wie gewohnt weiterbearbeitet.';
 
 /** Sleep for `ms` milliseconds */
 function sleep(ms: number): Promise<void> {

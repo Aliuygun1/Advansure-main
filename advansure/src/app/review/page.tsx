@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { TopBar } from "@/components/top-bar";
 import { GradeBadge } from "@/components/grade-badge";
 import { Icon } from "@/components/icons";
+import { FallbackNotice } from "@/components/fallback-notice";
 import { calcValuation } from "@/lib/valuation";
 import type { RoomInput } from "@/lib/valuation";
 
@@ -40,10 +41,13 @@ export default function ReviewPage() {
   const [showPauschal, setShowPauschal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [aiFallback, setAiFallback] = useState(false);
 
   useEffect(() => {
     const pid = sessionStorage.getItem("adv-persona") ?? "leon";
     setPersonaId(pid);
+
+    setAiFallback(sessionStorage.getItem("adv-ai-fallback") === "true");
 
     const damageRaw = sessionStorage.getItem("adv-damage");
     if (damageRaw) {
@@ -138,6 +142,15 @@ export default function ReviewPage() {
       <TopBar title="Zusammenfassung" onBack={() => router.push("/walk")} />
 
       <div className="adv-scroll" style={{ flex: 1, padding: "4px 18px 20px" }}>
+        {/* AI-Fallback notice */}
+        {aiFallback && (
+          <FallbackNotice
+            title="Manuelle Prüfung statt KI-Analyse"
+            message="Die automatische KI-Analyse ist derzeit nicht verfügbar. Deine Videos werden weitergeleitet und zeitnah von unserem Team geprüft. Eine automatische Pauschalsummen-Validierung erfolgt diesmal nicht – die Schadenhöhe legt unser Team fest."
+            style={{ marginBottom: 14 }}
+          />
+        )}
+
         {/* Damage type card */}
         <div
           className="adv-card rise"
@@ -381,26 +394,52 @@ export default function ReviewPage() {
           >
             Voraussichtliche Schadenhöhe
           </div>
-          <div
-            className="mono"
-            style={{
-              fontSize: 38,
-              fontWeight: 700,
-              letterSpacing: "-0.02em",
-              color: "var(--text)",
-            }}
-          >
-            {formatEuro(valuation.totalAmount)}
-          </div>
-          <div
-            style={{
-              fontSize: 12.5,
-              color: "var(--text-muted)",
-              marginTop: 6,
-            }}
-          >
-            Erste Einschätzung nach Pauschalmethode · ohne Selbstbeteiligung
-          </div>
+          {aiFallback ? (
+            <>
+              <div
+                style={{
+                  fontSize: 22,
+                  fontWeight: 700,
+                  letterSpacing: "-0.01em",
+                  color: "var(--text)",
+                }}
+              >
+                Wird manuell geprüft
+              </div>
+              <div
+                style={{
+                  fontSize: 12.5,
+                  color: "var(--text-muted)",
+                  marginTop: 6,
+                }}
+              >
+                Ohne KI-Analyse keine automatische Pauschalsummen-Validierung · unser Team ermittelt die Höhe
+              </div>
+            </>
+          ) : (
+            <>
+              <div
+                className="mono"
+                style={{
+                  fontSize: 38,
+                  fontWeight: 700,
+                  letterSpacing: "-0.02em",
+                  color: "var(--text)",
+                }}
+              >
+                {formatEuro(valuation.totalAmount)}
+              </div>
+              <div
+                style={{
+                  fontSize: 12.5,
+                  color: "var(--text-muted)",
+                  marginTop: 6,
+                }}
+              >
+                Erste Einschätzung nach Pauschalmethode · ohne Selbstbeteiligung
+              </div>
+            </>
+          )}
         </div>
 
         {error && (

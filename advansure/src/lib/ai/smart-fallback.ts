@@ -12,16 +12,6 @@
 
 import type { RoomAnalysis } from './schemas';
 
-type Grade = RoomAnalysis['damage_grade'];
-
-/** Conservative default grade per damage type. */
-const GRADE_BY_TYPE: Record<string, Grade> = {
-  wasser: 'mittel',
-  feuer: 'schwer',
-  sturm: 'mittel',
-  einbruch: 'leicht',
-};
-
 /** Room keywords we can detect in the free-text type / cause description. */
 const ROOM_KEYWORDS: Array<{ room: string; re: RegExp }> = [
   { room: 'Küche', re: /küche|herd|spülmaschine|waschmaschine/i },
@@ -57,10 +47,6 @@ function inferRoomType(type: string, cause: string, existing: string[]): string 
   return unused ?? 'Wohnzimmer';
 }
 
-function inferGrade(type: string): Grade {
-  return GRADE_BY_TYPE[type.toLowerCase()] ?? 'mittel';
-}
-
 function typeLabel(type: string): string {
   return TYPE_LABELS[type.toLowerCase()] ?? 'Schaden';
 }
@@ -71,15 +57,17 @@ function buildDamageKind(type: string, cause: string, roomType: string): string 
   return hasCause ? `${label} im ${roomType} (${cause})` : `${label} im ${roomType}`;
 }
 
-function buildUserMessage(roomType: string): string {
-  return `Danke für das Video! Ich konnte die Aufnahme nicht automatisch im Detail auswerten, habe den Raum aber als ${roomType} mit dem Schaden erfasst. Ein:e Sachbearbeiter:in prüft die Aufnahme noch einmal genau.`;
-}
-
 /**
- * Build a RoomAnalysis from the known damage context without a Gemini call.
+ * Build a RoomAnalysis when the Gemini Vision analysis is unavailable.
+ *
+ * The room is recorded (room_type + the user's described damage) so the claim
+ * can still be submitted, but the damage grade is deliberately set to
+ * 'nicht einschätzbar': no automatic flat-rate validation is performed without
+ * the AI analysis — the room is flagged for manual review instead. The
+ * user-facing copy is handled transparently in the UI via the `fallback` flag.
  *
  * Always returns `satisfied: true` so the walk loop can advance — the fallback
- * is a degraded mode and should never ask the user to re-record.
+ * should never ask the user to re-record.
  */
 export function buildSmartRoomAnalysis(
   damageContext: { type: string; cause: string },
@@ -89,15 +77,16 @@ export function buildSmartRoomAnalysis(
 ): RoomAnalysis {
   const room_type =
     hintRoomType ?? inferRoomType(damageContext.type, damageContext.cause, existingRoomTypes);
-  const damage_grade = inferGrade(damageContext.type);
 
   return {
     room_type,
-    damage_grade,
+    damage_grade: 'nicht einschätzbar',
     damage_kind: buildDamageKind(damageContext.type, damageContext.cause, room_type),
     satisfied: true,
-    user_message: buildUserMessage(room_type),
+    user_message:
+      'Danke für dein Video! Die automatische KI-Analyse ist gerade nicht verfügbar. ' +
+      'Deine Aufnahme wird gespeichert und an unser Team weitergeleitet – du kannst die Meldung wie gewohnt abschließen.',
     next_request: undefined,
-    ai_reasoning: `Heuristische Einschätzung (Fallback) basierend auf Schadenstyp "${damageContext.type}", Ursache "${damageContext.cause}", Iteration ${iteration}.`,
+    ai_reasoning: `Fallback ohne KI-Analyse: Schadenstyp "${damageContext.type}", Ursache "${damageContext.cause}", Iteration ${iteration}. Manuelle Prüfung erforderlich.`,
   };
 }

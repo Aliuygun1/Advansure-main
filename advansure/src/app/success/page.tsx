@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AveryOrb } from "@/components/avery-orb";
 import { Icon } from "@/components/icons";
+import { FallbackNotice } from "@/components/fallback-notice";
 
 interface ClaimData {
   vorgangsnummer: string;
@@ -21,6 +22,7 @@ export default function SuccessPage() {
   const router = useRouter();
   const [claim, setClaim] = useState<ClaimData | null>(null);
   const [copied, setCopied] = useState(false);
+  const [aiFallback, setAiFallback] = useState(false);
 
   useEffect(() => {
     const raw = sessionStorage.getItem("adv-claim");
@@ -29,6 +31,7 @@ export default function SuccessPage() {
         setClaim(JSON.parse(raw));
       } catch {/* ignore */}
     }
+    setAiFallback(sessionStorage.getItem("adv-ai-fallback") === "true");
   }, []);
 
   function copyVorgangsnummer() {
@@ -49,6 +52,7 @@ export default function SuccessPage() {
     sessionStorage.removeItem("adv-walk-id");
     sessionStorage.removeItem("adv-damage");
     sessionStorage.removeItem("adv-rooms");
+    sessionStorage.removeItem("adv-ai-fallback");
     router.push("/start");
   }
 
@@ -122,6 +126,15 @@ export default function SuccessPage() {
             darum.
           </p>
         </div>
+
+        {/* AI-Fallback notice — reassure that the claim is handled despite no AI analysis */}
+        {aiFallback && (
+          <FallbackNotice
+            title="Schadensmeldung erfolgreich übermittelt"
+            message="Die automatische KI-Analyse steht derzeit vorübergehend nicht zur Verfügung. Dein Video wurde dennoch an unser zuständiges Team weitergeleitet und wird zeitnah geprüft. Eine automatische Pauschalsummen-Validierung kann in diesem Fall nicht erfolgen. Für dich besteht kein weiterer Handlungsbedarf – wir kümmern uns schnellstmöglich um die weitere Bearbeitung deines Anliegens."
+            style={{ marginTop: 22 }}
+          />
+        )}
 
         {/* Vorgangsnummer (copyable) */}
         <button
@@ -209,12 +222,18 @@ export default function SuccessPage() {
             <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
               Voraussichtliche Schadenhöhe
             </div>
-            <div
-              className="mono"
-              style={{ fontSize: 20, fontWeight: 700, color: "var(--text)" }}
-            >
-              {formatEuro(totalAmount)}
-            </div>
+            {aiFallback ? (
+              <div style={{ fontSize: 17, fontWeight: 700, color: "var(--text)" }}>
+                Wird manuell geprüft
+              </div>
+            ) : (
+              <div
+                className="mono"
+                style={{ fontSize: 20, fontWeight: 700, color: "var(--text)" }}
+              >
+                {formatEuro(totalAmount)}
+              </div>
+            )}
           </div>
           <span
             style={{

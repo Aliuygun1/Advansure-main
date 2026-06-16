@@ -9,6 +9,7 @@ import { AveryOrb } from '@/components/avery-orb';
 import { GradeBadge } from '@/components/grade-badge';
 import { TopBar } from '@/components/top-bar';
 import { Icon } from '@/components/icons';
+import { FallbackNotice } from '@/components/fallback-notice';
 import type { DamageGrade } from '@/components/grade-badge';
 
 // ---------------------------------------------------------------------------
@@ -50,6 +51,8 @@ interface AnalyzeApiResponse {
   satisfied: boolean;
   nextRequest: string | null;
   userMessage: string;
+  /** True when the AI analysis was unavailable and a manual-review fallback was used. */
+  fallback?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -714,6 +717,11 @@ export default function WalkPage() {
       }
 
       const analyzeData = (await analyzeRes.json()) as AnalyzeApiResponse;
+      // Remember (for the whole claim) that the AI analysis was unavailable, so
+      // the review and success screens can communicate this transparently.
+      if (analyzeData.fallback) {
+        sessionStorage.setItem('adv-ai-fallback', 'true');
+      }
       setCurrentResult(analyzeData);
       setPhase('result');
     } catch (err) {
@@ -1052,7 +1060,7 @@ export default function WalkPage() {
   // Render: result
   // ---------------------------------------------------------------------------
   if (phase === 'result' && currentResult) {
-    const { room, satisfied, nextRequest, userMessage } = currentResult;
+    const { room, satisfied, nextRequest, userMessage, fallback } = currentResult;
     const showNextRoomOption = satisfied || isAtMaxIterations;
     const grade = room.damage_grade as DamageGrade;
 
@@ -1135,10 +1143,12 @@ export default function WalkPage() {
             <p style={{ margin: '0 0 12px', fontSize: 13.5, color: 'var(--text-muted)', lineHeight: 1.45 }}>
               {room.damage_kind}
             </p>
-            <p style={{ margin: '0 0 10px', fontSize: 13.5, color: 'var(--text)', lineHeight: 1.45 }}>
-              {userMessage}
-            </p>
-            {showNextRoomOption && (
+            {!fallback && (
+              <p style={{ margin: '0 0 10px', fontSize: 13.5, color: 'var(--text)', lineHeight: 1.45 }}>
+                {userMessage}
+              </p>
+            )}
+            {showNextRoomOption && !fallback && (
               <div
                 style={{
                   display: 'flex',
@@ -1159,6 +1169,15 @@ export default function WalkPage() {
               </div>
             )}
           </div>
+
+          {/* Transparent notice when the AI analysis was unavailable */}
+          {fallback && (
+            <FallbackNotice
+              title="KI-Analyse gerade nicht verfügbar"
+              message="Kein Problem – dein Video wird gespeichert und an unser Team weitergeleitet. Eine automatische Schätzung der Schadenhöhe ist diesmal nicht möglich; die Prüfung übernehmen wir manuell. Du kannst die Meldung wie gewohnt abschließen."
+              style={{ marginBottom: 14 }}
+            />
+          )}
 
           {/* Actions */}
           {!showNextRoomOption ? (

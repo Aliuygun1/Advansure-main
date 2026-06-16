@@ -24,13 +24,19 @@ export const ROOM_SIZES: Record<string, number> = {
   Esszimmer: 12,
 };
 
-/** Damage rate in €/m² per damage grade. */
+/**
+ * Damage rate in €/m² per damage grade.
+ *
+ * 'nicht einschätzbar' is intentionally NOT listed: getRateForGrade returns
+ * null for it, which flags the room for manual review and excludes it from the
+ * automatic total. This is also the grade used when the AI analysis is
+ * unavailable (fallback) — no automatic flat-rate validation is possible then.
+ */
 export const RATES: Record<string, number> = {
   leicht: 200,
   mittel: 450,
   schwer: 800,
   total: 800, // same as schwer per concept and data.js
-  'nicht einschätzbar': 0,
 };
 
 /**
