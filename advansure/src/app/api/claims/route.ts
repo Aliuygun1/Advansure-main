@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db/client";
 import { claims, rooms, policies, audit_logs } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import crypto from "crypto";
 
 // TU-06: POST /api/claims — atomare Transaktion, Vorgangsnummer
@@ -51,6 +51,36 @@ async function generateVorgangsnummer(): Promise<string> {
 
   const seq = (existing.length + 1).toString().padStart(4, "0");
   return `ADV-${year}-${seq}`;
+}
+
+// GET /api/claims?personaId=... — list all reported claims for a persona,
+// newest first, for the Schadenübersicht overview.
+export async function GET(req: NextRequest) {
+  const personaId = req.nextUrl.searchParams.get("personaId");
+  if (!personaId) {
+    return NextResponse.json({ error: "personaId erforderlich" }, { status: 400 });
+  }
+
+  try {
+    const rows = await db
+      .select({
+        id: claims.id,
+        damageType: claims.damage_type,
+        cause: claims.cause,
+        status: claims.status,
+        vorgangsnummer: claims.vorgangsnummer,
+        totalAmount: claims.total_amount,
+        createdAt: claims.created_at,
+      })
+      .from(claims)
+      .where(eq(claims.persona_id, personaId))
+      .orderBy(desc(claims.created_at));
+
+    return NextResponse.json({ claims: rows }, { status: 200 });
+  } catch (err) {
+    console.error("[/api/claims GET]", err);
+    return NextResponse.json({ error: "Interner Fehler" }, { status: 500 });
+  }
 }
 
 export async function POST(req: NextRequest) {

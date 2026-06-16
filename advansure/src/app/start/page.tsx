@@ -87,6 +87,11 @@ export default function StartPage() {
     router.push("/chat");
   }
 
+  function openClaimsOverview() {
+    sessionStorage.setItem("adv-persona", personaId);
+    router.push("/claims");
+  }
+
   // Derive display data (fallback while loading)
   const p = persona ?? OFFLINE_FALLBACK[personaId];
   const pol = policy ?? OFFLINE_POLICIES[personaId];
@@ -242,6 +247,16 @@ export default function StartPage() {
         >
           <Icon name="sparkle" size={20} color="var(--accent-ink)" />
           {loading ? "Laden…" : "Schaden melden"}
+        </button>
+
+        {/* Secondary CTA — overview of reported claims */}
+        <button
+          className="btn btn-ghost btn-block rise"
+          style={{ marginBottom: 14, animationDelay: "0.16s" }}
+          onClick={openClaimsOverview}
+        >
+          <Icon name="doc" size={19} color="var(--text)" />
+          Schadenübersicht
         </button>
 
         {/* Policy card */}
