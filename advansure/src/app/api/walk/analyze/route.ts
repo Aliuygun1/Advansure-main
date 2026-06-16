@@ -5,7 +5,8 @@ import { db } from '@/lib/db/client';
 import { walks, rooms, audit_logs } from '@/lib/db/schema';
 import { getAI, VISION_MODEL } from '@/lib/ai/gemini';
 import { ROOM_ANALYSIS_SYSTEM_PROMPT } from '@/lib/ai/prompt-builder';
-import { parseRoomAnalysis } from '@/lib/ai/schemas';
+import { parseRoomAnalysis, type RoomAnalysis } from '@/lib/ai/schemas';
+import { buildSmartRoomAnalysis } from '@/lib/ai/smart-fallback';
 import { getDefaultArea, getRateForGrade } from '@/lib/valuation/config';
 
 // TU-04: POST /api/walk/analyze — Gemini Vision multimodal room analysis
@@ -209,44 +210,31 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     const existingRoomTypes = existingRooms.map((r) => r.room_type);
 
-    // Call Gemini Vision
-    let rawResponse: string;
+    // Call Gemini Vision — on a model failure or an unparseable response, fall
+    // back to a heuristic estimate from the known damage context so the walk
+    // never dead-ends with a 502.
+    let analysis: RoomAnalysis;
     try {
-      rawResponse = await callGeminiWithRetry(input, existingRoomTypes);
+      const rawResponse = await callGeminiWithRetry(input, existingRoomTypes);
+      console.log('[analyze] Raw Gemini response for walk', walkId, ':', rawResponse);
+
+      const analysisResult = parseRoomAnalysis(rawResponse);
+      if (analysisResult.ok) {
+        analysis = analysisResult.data;
+      } else {
+        console.warn(
+          '[analyze] Parse error for walk', walkId, '— using smart fallback:',
+          analysisResult.error,
+        );
+        analysis = buildSmartRoomAnalysis(input.damageContext, existingRoomTypes, input.iteration);
+      }
     } catch (err) {
-      // Mark walk as errored
-      await db
-        .update(walks)
-        .set({ status: 'error_external_api' })
-        .where(eq(walks.id, walkId));
-
       const detail = err instanceof Error ? err.message : 'Gemini error';
-      console.error('[analyze] Gemini error for walk', walkId, ':', detail);
-      return NextResponse.json(
-        { error: 'KI-Analyse fehlgeschlagen', detail },
-        { status: 502 },
+      console.warn(
+        '[analyze] Gemini unavailable for walk', walkId, '— using smart fallback:', detail,
       );
+      analysis = buildSmartRoomAnalysis(input.damageContext, existingRoomTypes, input.iteration);
     }
-
-    // Parse and validate Gemini response
-    console.log('[analyze] Raw Gemini response for walk', walkId, ':', rawResponse);
-    const analysisResult = parseRoomAnalysis(rawResponse);
-
-    if (!analysisResult.ok) {
-      // Mark walk as errored
-      await db
-        .update(walks)
-        .set({ status: 'error_external_api' })
-        .where(eq(walks.id, walkId));
-
-      console.error('[analyze] Parse error for walk', walkId, ':', analysisResult.error);
-      return NextResponse.json(
-        { error: 'KI-Antwort konnte nicht verarbeitet werden', detail: analysisResult.error },
-        { status: 502 },
-      );
-    }
-
-    const analysis = analysisResult.data;
 
     // Calculate valuation
     const area_m2 = getDefaultArea(analysis.room_type);
