@@ -13,9 +13,6 @@ import { z } from 'zod';
 // TU-02 — Intent extraction from free-text damage description
 // ---------------------------------------------------------------------------
 
-/** Valid damage types as recognised in the product concept */
-const DamageTypeSchema = z.enum(['wasser', 'feuer', 'einbruch', 'sturm']);
-
 /**
  * TU-02: Schema for the structured intent Gemini extracts from a user message.
  *

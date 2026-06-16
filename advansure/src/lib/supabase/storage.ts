@@ -15,37 +15,60 @@ import { createServerSupabase } from './server';
 
 const BUCKET = 'walks';
 
+/** File extension per supported video MIME type (covers live webm + common uploads). */
+const EXT_BY_TYPE: Record<string, string> = {
+  'video/webm': 'webm',
+  'video/mp4': 'mp4',
+  'video/quicktime': 'mov',
+  'video/x-matroska': 'mkv',
+  'video/3gpp': '3gp',
+  'video/mpeg': 'mpeg',
+};
+
+/** Normalize a Content-Type header ("video/mp4; codecs=...") to its bare MIME type. */
+function bareMime(contentType: string): string {
+  return contentType.toLowerCase().split(';')[0].trim();
+}
+
+function extForType(contentType: string): string {
+  return EXT_BY_TYPE[bareMime(contentType)] ?? 'webm';
+}
+
 /**
  * TU-03: Upload a single video clip for a given walk iteration.
  *
- * @param walkId     UUID of the walk
- * @param iteration  1-based iteration counter (persisted in walks.iteration_count)
- * @param file       File (browser) or Buffer (server Route Handler)
- * @returns          Public URL of the uploaded webm file
+ * @param walkId       UUID of the walk
+ * @param iteration    1-based iteration counter (persisted in walks.iteration_count)
+ * @param file         File (browser) or Buffer (server Route Handler)
+ * @param contentType  MIME type of the video; required for Buffers so live
+ *                      recordings (webm) and uploads (mp4/mov/…) are stored and
+ *                      later served with the correct type for Gemini.
+ * @returns            Public URL of the uploaded file
  */
 export async function uploadVideo(
   walkId: string,
   iteration: number,
   file: File | Buffer,
+  contentType?: string,
 ): Promise<string> {
   const supabase = createServerSupabase();
 
-  const path = `walks/${walkId}/${iteration}.webm`;
-
   let body: File | Uint8Array;
-  let contentType: string;
+  let resolvedType: string;
 
   if (Buffer.isBuffer(file)) {
     body = new Uint8Array(file);
-    contentType = 'video/webm';
+    resolvedType = contentType || 'video/webm';
   } else {
     const f = file as File;
     body = f;
-    contentType = f.type || 'video/webm';
+    resolvedType = contentType || f.type || 'video/webm';
   }
 
+  const path = `walks/${walkId}/${iteration}.${extForType(resolvedType)}`;
+
   const { error } = await supabase.storage.from(BUCKET).upload(path, body, {
-    contentType,
+    contentType: resolvedType,
     upsert: true, // overwrite if a retry uploads the same iteration
   });
 

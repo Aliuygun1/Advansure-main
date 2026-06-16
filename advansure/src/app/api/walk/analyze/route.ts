@@ -82,12 +82,16 @@ async function callGeminiWithRetry(
     if (!videoRes.ok) {
       throw new Error(`Video-Download fehlgeschlagen: HTTP ${videoRes.status}`);
     }
-    const videoBlob = new Blob([await videoRes.arrayBuffer()], { type: 'video/webm' });
+    // Use the stored MIME type (webm for live recordings, mp4/mov for uploads)
+    const mimeType = (videoRes.headers.get('content-type') ?? 'video/webm')
+      .split(';')[0]
+      .trim();
+    const videoBlob = new Blob([await videoRes.arrayBuffer()], { type: mimeType });
 
     // Upload to Gemini Files API — only these URIs are accepted by fileData.fileUri
     const uploadedFile = await ai.files.upload({
       file: videoBlob,
-      config: { mimeType: 'video/webm' },
+      config: { mimeType },
     });
     geminiFileName = uploadedFile.name;
 
@@ -126,7 +130,7 @@ async function callGeminiWithRetry(
               parts: [
                 {
                   fileData: {
-                    mimeType: 'video/webm',
+                    mimeType,
                     fileUri,
                   },
                 },

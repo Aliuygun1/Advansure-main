@@ -474,6 +474,7 @@ export default function WalkPage() {
   const recStartRef = useRef(0);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ---------------------------------------------------------------------------
   // Bootstrap: read sessionStorage
@@ -779,6 +780,38 @@ export default function WalkPage() {
   }
 
   // ---------------------------------------------------------------------------
+  // Upload an existing video file instead of a live recording.
+  // Reuses the same upload + analyze pipeline via handleVideoReady.
+  // ---------------------------------------------------------------------------
+  function openFilePicker() {
+    setErrorMessage(null);
+    fileInputRef.current?.click();
+  }
+
+  function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    // Reset value so picking the same file again still fires onChange
+    e.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('video/')) {
+      setErrorMessage('Bitte wähle eine Videodatei aus.');
+      return;
+    }
+    handleVideoReady(file);
+  }
+
+  /** Hidden file input — rendered inside each screen that offers an upload. */
+  const fileInput = (
+    <input
+      ref={fileInputRef}
+      type="file"
+      accept="video/*"
+      onChange={handleFileSelected}
+      style={{ display: 'none' }}
+    />
+  );
+
+  // ---------------------------------------------------------------------------
   // Derived values
   // ---------------------------------------------------------------------------
   const MAX_ITERATIONS = 3;
@@ -850,6 +883,11 @@ export default function WalkPage() {
             >
               Nicht erlauben
             </button>
+            <button className="btn btn-ghost btn-block" onClick={openFilePicker}>
+              <Icon name="arrowUp" size={19} />
+              Video hochladen
+            </button>
+            {fileInput}
           </div>
         </div>
 
@@ -929,10 +967,15 @@ export default function WalkPage() {
               <Icon name="camera" size={20} color="var(--accent-ink)" />
               Neu anfragen
             </button>
+            <button className="btn btn-ghost btn-block" onClick={openFilePicker}>
+              <Icon name="arrowUp" size={19} />
+              Video hochladen
+            </button>
             <button className="btn btn-ghost btn-block" onClick={handleGoTextFallback}>
               <Icon name="edit" size={19} />
               Textbasiert beschreiben
             </button>
+            {fileInput}
           </div>
         </div>
       </div>
@@ -1334,6 +1377,37 @@ export default function WalkPage() {
           />
         </button>
       </div>
+
+      {/* Upload-from-file alternative (hidden while recording) */}
+      {!isRecording && (
+        <button
+          onClick={openFilePicker}
+          aria-label="Video hochladen"
+          style={{
+            position: 'absolute',
+            bottom: 58,
+            right: 22,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 7,
+            background: 'rgba(0,0,0,.45)',
+            backdropFilter: 'blur(8px)',
+            border: 'none',
+            borderRadius: 999,
+            padding: '9px 15px',
+            color: '#fff',
+            fontSize: 13.5,
+            fontWeight: 600,
+            cursor: 'pointer',
+            zIndex: 10,
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          <Icon name="arrowUp" size={17} color="#fff" />
+          Hochladen
+        </button>
+      )}
+      {fileInput}
 
       {/* Cancel button */}
       <button

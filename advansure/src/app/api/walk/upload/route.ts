@@ -17,11 +17,15 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** Max accepted upload size — guards Storage + Gemini against oversized files. */
+const MAX_UPLOAD_BYTES = 50 * 1024 * 1024; // 50 MB
+
 /** Upload with up to 2 retries and 500 ms backoff */
 async function uploadWithRetry(
   walkId: string,
   iteration: number,
   buffer: Buffer,
+  contentType: string,
 ): Promise<string> {
   let lastError: Error | null = null;
 
@@ -30,7 +34,7 @@ async function uploadWithRetry(
       if (attempt > 0) {
         await sleep(500 * attempt);
       }
-      const url = await uploadVideo(walkId, iteration, buffer);
+      const url = await uploadVideo(walkId, iteration, buffer, contentType);
       return url;
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
@@ -94,12 +98,25 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       );
     }
 
+    // Guard against oversized uploads (Storage + Gemini limits)
+    if (videoFile.size > MAX_UPLOAD_BYTES) {
+      return NextResponse.json(
+        {
+          error: 'Video zu groß',
+          message: 'Das Video ist zu groß (maximal 50 MB). Bitte nimm ein kürzeres Video auf.',
+        },
+        { status: 422 },
+      );
+    }
+
     // Convert File to Buffer for server-side upload
     const arrayBuffer = await videoFile.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Upload to Supabase Storage with retry
-    const url = await uploadWithRetry(walkId, iteration, buffer);
+    // Upload to Supabase Storage with retry — preserve the real MIME type so
+    // uploaded mp4/mov files are served correctly to Gemini (not as webm).
+    const contentType = videoFile.type || 'video/webm';
+    const url = await uploadWithRetry(walkId, iteration, buffer, contentType);
 
     // Update room's video_url if a room for this walk + iteration already exists
     // (room may have been pre-created by analyze; we match by walk_id + iteration order)
