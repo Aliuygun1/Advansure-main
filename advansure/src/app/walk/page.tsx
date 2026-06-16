@@ -529,24 +529,70 @@ export default function WalkPage() {
   // ---------------------------------------------------------------------------
   // Camera permission + stream
   // ---------------------------------------------------------------------------
-  const requestCamera = useCallback(async () => {
-    try {
-      // Check MediaRecorder support
-      if (typeof MediaRecorder === 'undefined') {
-        setPhase('camera-denied');
-        return;
-      }
 
+  /** True when we already hold a usable (live) camera stream. */
+  const hasLiveStream = useCallback((): boolean => {
+    const stream = mediaStreamRef.current;
+    return !!stream && stream.getVideoTracks().some((t) => t.readyState === 'live');
+  }, []);
+
+  /**
+   * Ensure we have a live camera stream, requesting permission if needed.
+   * Returns true if a usable stream is available afterwards.
+   *
+   * - Reuses an existing live stream (no repeated permission prompt).
+   * - Triggers the browser permission prompt on first use.
+   * - Routes to the camera-denied screen if permission is refused/unavailable.
+   */
+  const requestCamera = useCallback(async (): Promise<boolean> => {
+    // Already granted earlier in this walk → reuse, no new prompt.
+    if (hasLiveStream()) {
+      setPhase('viewfinder');
+      return true;
+    }
+
+    // Check MediaRecorder + getUserMedia support
+    if (
+      typeof MediaRecorder === 'undefined' ||
+      typeof navigator === 'undefined' ||
+      !navigator.mediaDevices?.getUserMedia
+    ) {
+      setPhase('camera-denied');
+      return false;
+    }
+
+    try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } },
         audio: false,
       });
       mediaStreamRef.current = stream;
       setPhase('viewfinder');
+      return true;
     } catch {
       setPhase('camera-denied');
+      return false;
     }
-  }, []);
+  }, [hasLiveStream]);
+
+  /**
+   * Record-button handler. Always checks the current permission/stream status
+   * before recording, so capture works regardless of prior actions (e.g. a
+   * previous video upload that never opened the camera).
+   */
+  const handleRecordPress = useCallback(async () => {
+    if (phase === 'recording') {
+      stopRecording();
+      return;
+    }
+    // No live stream yet (e.g. user uploaded first) → request permission now.
+    if (!hasLiveStream()) {
+      const granted = await requestCamera();
+      if (!granted) return; // camera-denied screen already shown
+    }
+    startRecording();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, hasLiveStream, requestCamera]);
 
   // ---------------------------------------------------------------------------
   // Recording logic
@@ -1365,7 +1411,7 @@ export default function WalkPage() {
         }}
       >
         <button
-          onClick={isRecording ? stopRecording : startRecording}
+          onClick={handleRecordPress}
           aria-label={isRecording ? 'Aufnahme stoppen' : 'Aufnahme starten'}
           disabled={isRecording && !canStop}
           style={{
