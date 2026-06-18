@@ -38,6 +38,16 @@ const STANDARD_ROOMS = [
   'Keller',
 ];
 
+/**
+ * Shown instead of the model's reply when the last iteration is reached but the
+ * AI still wanted another clip — reassures the user that no further video is
+ * needed and that the recordings are forwarded to a human case handler.
+ */
+const LAST_ITERATION_MESSAGE =
+  'Das war die letzte Aufnahme für diesen Raum – du musst kein weiteres Video mehr machen. ' +
+  'Auch wenn ich nicht alles automatisch einschätzen konnte: Deine Videos werden trotzdem an ' +
+  'unsere:n Sachbearbeiter:in weitergeleitet und dort persönlich geprüft.';
+
 interface DamageContext {
   type: string;
   cause: string;
@@ -1229,6 +1239,8 @@ export default function WalkPage() {
   if (phase === 'result' && currentResult) {
     const { room, satisfied, nextRequest, userMessage, fallback } = currentResult;
     const showNextRoomOption = satisfied || isAtMaxIterations;
+    // Last iteration reached but the AI still wanted more → no further video.
+    const lastIterationReached = isAtMaxIterations && !satisfied;
     const grade = room.damage_grade as DamageGrade;
 
     return (
@@ -1289,8 +1301,8 @@ export default function WalkPage() {
                 color: '#E9A23B',
               }}
             >
-              <Icon name="warning" size={16} color="#E9A23B" />
-              <span>Maximale Anzahl an Aufnahmen erreicht.</span>
+              <Icon name="checkCircle" size={16} color="#E9A23B" />
+              <span>Letzte Aufnahme erreicht – kein weiteres Video nötig.</span>
             </div>
           )}
 
@@ -1312,7 +1324,7 @@ export default function WalkPage() {
             </p>
             {!fallback && (
               <p style={{ margin: '0 0 10px', fontSize: 13.5, color: 'var(--text)', lineHeight: 1.45 }}>
-                {userMessage}
+                {lastIterationReached ? LAST_ITERATION_MESSAGE : userMessage}
               </p>
             )}
             {showNextRoomOption && !fallback && (
