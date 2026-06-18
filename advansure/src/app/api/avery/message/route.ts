@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createHash } from 'crypto';
-import { eq, asc } from 'drizzle-orm';
+import { and, eq, asc, gte } from 'drizzle-orm';
 
 import { db } from '@/lib/db/client';
 import { conversations, audit_logs } from '@/lib/db/schema';
@@ -54,6 +54,9 @@ async function callGeminiWithRetry(
 
   for (let attempt = 0; attempt <= delays.length; attempt++) {
     try {
+      // Always create a BRAND-NEW chat session per request. `history` only ever
+      // contains the current claim's turns (see step 2) — never another claim's.
+      // No chat instance is cached or reused across Schadensmeldungen.
       const chat = ai.chats.create({
         model: CHAT_MODEL,
         config: {
@@ -98,29 +101,63 @@ export async function POST(req: NextRequest) {
   const { personaId, message, conversationId } = parsed;
   const requestHash = sha256(rawBody);
 
-  // 2. Load conversation history (last 10 messages for context)
+  // 2. Load conversation history — STRICTLY scoped to the CURRENT conversation
+  //    session.
+  //
+  //    ISOLATION REQUIREMENT: every new Schadensmeldung MUST be processed in a
+  //    brand-new, independent Gemini session. No messages, context or results
+  //    from earlier claims of the same persona may leak into this analysis.
+  //
+  //    How isolation is guaranteed here:
+  //    - A new claim clears the stored conversationId on the client
+  //      (see start/page.tsx → startClaim), so the FIRST message of a new claim
+  //      arrives WITHOUT a conversationId. In that case history stays empty and
+  //      the Gemini chat below is created fresh with zero prior turns.
+  //    - Follow-up messages of the SAME claim send the conversationId, which
+  //      anchors the session's start timestamp; only messages from that anchor
+  //      onward are replayed — never anything from a previous claim.
+  //
+  //    We therefore deliberately do NOT load history by persona_id alone (that
+  //    would replay the persona's entire cross-claim history into every chat).
   let history: Array<{ role: string; content: string }> = [];
   let activeConvId = conversationId;
 
-  try {
-    const rows = await db
-      .select({ role: conversations.role, content: conversations.content })
-      .from(conversations)
-      .where(eq(conversations.persona_id, personaId))
-      .orderBy(asc(conversations.created_at))
-      .limit(20);
+  if (conversationId) {
+    try {
+      // Anchor = the first message row of this conversation session.
+      const [anchor] = await db
+        .select({ createdAt: conversations.created_at })
+        .from(conversations)
+        .where(eq(conversations.id, conversationId))
+        .limit(1);
 
-    // Gemini requires strictly alternating user/model turns.
-    // Deduplicate consecutive same-role messages before passing to Gemini.
-    const alternating: typeof rows = [];
-    for (const row of rows) {
-      const last = alternating[alternating.length - 1];
-      if (!last || last.role !== row.role) alternating.push(row);
+      if (anchor?.createdAt) {
+        const rows = await db
+          .select({ role: conversations.role, content: conversations.content })
+          .from(conversations)
+          .where(
+            and(
+              eq(conversations.persona_id, personaId),
+              gte(conversations.created_at, anchor.createdAt),
+            ),
+          )
+          .orderBy(asc(conversations.created_at))
+          .limit(20);
+
+        // Gemini requires strictly alternating user/model turns.
+        // Deduplicate consecutive same-role messages before passing to Gemini.
+        const alternating: typeof rows = [];
+        for (const row of rows) {
+          const last = alternating[alternating.length - 1];
+          if (!last || last.role !== row.role) alternating.push(row);
+        }
+        history = alternating.slice(-10);
+      }
+    } catch {
+      history = [];
     }
-    history = alternating.slice(-10);
-  } catch {
-    history = [];
   }
+  // No conversationId → brand-new session → history stays [] (full isolation).
 
   // 3. Persist user message to DB
   let userRowId: string | undefined;

@@ -66,6 +66,13 @@ Antworte NUR mit folgendem JSON (kein Markdown, kein Kommentar):
  *
  * Videos must be uploaded to the Gemini Files API first — Gemini cannot
  * fetch arbitrary external URLs (e.g. Supabase Storage) via fileData.fileUri.
+ *
+ * CONTEXT ISOLATION: this is a single, self-contained, stateless request.
+ * It uses `ai.models.generateContent` (no chat/session memory) and sends ONLY
+ * the current claim's data: this video + a prompt whose room context is scoped
+ * to the current walkId (`existingRoomTypes`, see the analyze handler). No prior
+ * Schadensmeldung's video, prompt or result can influence it. The uploaded
+ * Gemini file is deleted again in the `finally` block, so nothing persists.
  */
 async function callGeminiWithRetry(
   input: AnalyzeInput,
