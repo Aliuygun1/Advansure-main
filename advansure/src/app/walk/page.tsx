@@ -19,12 +19,24 @@ import type { DamageGrade } from '@/components/grade-badge';
 type WalkPhase =
   | 'permission'
   | 'camera-denied'
+  | 'room-select'
   | 'viewfinder'
   | 'recording'
   | 'uploading'
   | 'analyzing'
   | 'result'
   | 'too-short';
+
+/** Suggested standard rooms offered when adding a further room. */
+const STANDARD_ROOMS = [
+  'Wohnzimmer',
+  'Schlafzimmer',
+  'Kinderzimmer',
+  'Küche',
+  'Badezimmer',
+  'Arbeitszimmer / Büro',
+  'Keller',
+];
 
 interface DamageContext {
   type: string;
@@ -461,6 +473,8 @@ export default function WalkPage() {
   const [phase, setPhase] = useState<WalkPhase>('permission');
   const [iteration, setIteration] = useState(1);
   const [completedRooms, setCompletedRooms] = useState<RoomResult[]>([]);
+  // Room type the user picked for the current room (null = let the AI detect it)
+  const [selectedRoomType, setSelectedRoomType] = useState<string | null>(null);
   const [currentResult, setCurrentResult] = useState<AnalyzeApiResponse | null>(null);
   const [instruction, setInstruction] = useState(
     'Filme zuerst den Raum mit dem größten Schaden von allen Seiten (mind. 2 Sek.).',
@@ -753,6 +767,8 @@ export default function WalkPage() {
           videoUrl,
           iteration,
           damageContext,
+          // Honour the user's room selection when they picked one
+          hintRoomType: selectedRoomType ?? undefined,
         }),
       });
 
@@ -794,15 +810,35 @@ export default function WalkPage() {
 
   function handleAddMoreRoom() {
     if (!currentResult) return;
-    // Save completed room
+    // Save completed room, then let the user pick the next room type.
     setCompletedRooms((prev) => [...prev, currentResult.room]);
     setCurrentResult(null);
+    setSelectedRoomType(null);
     setIteration(1);
-    setInstruction(
-      'Super. Gibt es noch einen weiteren betroffenen Raum? Dann filme jetzt den nächsten.',
-    );
     setTimer('00:00');
     setElapsedSec(0);
+    setPhase('room-select');
+  }
+
+  /** Continue to the viewfinder for a specific (user-picked) room. */
+  function selectRoom(room: string) {
+    setSelectedRoomType(room);
+    setIteration(1);
+    setInstruction(`Alles klar – filme jetzt „${room}“ von allen Seiten (mind. 2 Sek.).`);
+    setTimer('00:00');
+    setElapsedSec(0);
+    setCurrentResult(null);
+    setPhase('viewfinder');
+  }
+
+  /** Continue without a selection — let the AI detect the room from the video. */
+  function skipRoomSelect() {
+    setSelectedRoomType(null);
+    setIteration(1);
+    setInstruction('Filme den nächsten betroffenen Raum von allen Seiten (mind. 2 Sek.).');
+    setTimer('00:00');
+    setElapsedSec(0);
+    setCurrentResult(null);
     setPhase('viewfinder');
   }
 
@@ -952,6 +988,91 @@ export default function WalkPage() {
         >
           <Icon name="close" size={20} color="#fff" />
         </button>
+        {showCancel && (
+          <CancelDialog
+            onConfirm={handleCancelConfirm}
+            onDismiss={() => setShowCancel(false)}
+          />
+        )}
+      </div>
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Render: room-select (choose the next room before filming)
+  // ---------------------------------------------------------------------------
+  if (phase === 'room-select') {
+    return (
+      <div className="adv-screen">
+        <TopBar title="Raum auswählen" onBack={() => setShowCancel(true)} />
+        <div className="adv-scroll" style={{ flex: 1, padding: '6px 20px 24px' }}>
+          <div
+            className="rise"
+            style={{ display: 'flex', gap: 11, alignItems: 'flex-start', marginBottom: 18 }}
+          >
+            <AveryOrb size={36} state="speaking" />
+            <p
+              style={{
+                margin: 0,
+                fontSize: 15,
+                color: 'var(--text)',
+                lineHeight: 1.5,
+                paddingTop: 4,
+              }}
+            >
+              Welchen Raum möchtest du als Nächstes aufnehmen? Wähle einen Vorschlag – oder lass
+              ihn automatisch erkennen.
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {STANDARD_ROOMS.map((room, i) => (
+              <button
+                key={room}
+                onClick={() => selectRoom(room)}
+                className="adv-card rise"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: '15px 16px',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  width: '100%',
+                  animationDelay: `${Math.min(i * 0.04, 0.2)}s`,
+                }}
+              >
+                <span
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 11,
+                    background: 'var(--accent-soft)',
+                    display: 'grid',
+                    placeItems: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  <Icon name="home" size={19} color="var(--accent-deep)" />
+                </span>
+                <span style={{ fontSize: 15.5, fontWeight: 600, color: 'var(--text)', flex: 1 }}>
+                  {room}
+                </span>
+                <Icon name="chevron" size={17} color="var(--text-faint)" />
+              </button>
+            ))}
+          </div>
+
+          <button
+            className="btn btn-ghost btn-block"
+            style={{ marginTop: 16, height: 50 }}
+            onClick={skipRoomSelect}
+          >
+            <Icon name="sparkle" size={18} color="var(--accent-deep)" />
+            Raum automatisch erkennen
+          </button>
+        </div>
+
         {showCancel && (
           <CancelDialog
             onConfirm={handleCancelConfirm}

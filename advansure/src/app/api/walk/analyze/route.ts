@@ -20,6 +20,9 @@ const AnalyzeSchema = z.object({
     type: z.string().min(1),
     cause: z.string().min(1),
   }),
+  // Optional: room type the user explicitly picked for this clip (e.g. when
+  // adding a further room). When set, it is treated as authoritative.
+  hintRoomType: z.string().min(1).optional(),
 });
 
 type AnalyzeInput = z.infer<typeof AnalyzeSchema>;
@@ -48,7 +51,7 @@ Du analysierst ein Video von einem beschädigten Raum in einer Wohnung.
 Schadenstyp: ${input.damageContext.type} | Ursache: ${input.damageContext.cause}
 Bisher erfasste Räume: ${existingList}
 Iteration ${input.iteration} von maximal 3.
-
+${input.hintRoomType ? `Der Nutzer hat diesen Raum ausdrücklich als "${input.hintRoomType}" angegeben — verwende exakt diesen Wert als room_type.\n` : ''}
 Antworte NUR mit folgendem JSON (kein Markdown, kein Kommentar):
 {
   "room_type": "Küche" | "Bad" | "Wohnzimmer" | "Schlafzimmer" | "Flur" | "Kinderzimmer" | "Arbeitszimmer" | "Keller" | "Esszimmer",
@@ -238,7 +241,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           '[analyze] Parse error for walk', walkId, '— using smart fallback:',
           analysisResult.error,
         );
-        analysis = buildSmartRoomAnalysis(input.damageContext, existingRoomTypes, input.iteration);
+        analysis = buildSmartRoomAnalysis(input.damageContext, existingRoomTypes, input.iteration, input.hintRoomType);
         usedFallback = true;
       }
     } catch (err) {
@@ -246,8 +249,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       console.warn(
         '[analyze] Gemini unavailable for walk', walkId, '— using smart fallback:', detail,
       );
-      analysis = buildSmartRoomAnalysis(input.damageContext, existingRoomTypes, input.iteration);
+      analysis = buildSmartRoomAnalysis(input.damageContext, existingRoomTypes, input.iteration, input.hintRoomType);
       usedFallback = true;
+    }
+
+    // The user's explicit room selection is authoritative — never let the model
+    // override a room the user picked themselves.
+    if (input.hintRoomType) {
+      analysis.room_type = input.hintRoomType;
     }
 
     // Calculate valuation

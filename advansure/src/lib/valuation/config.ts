@@ -15,11 +15,13 @@
 export const ROOM_SIZES: Record<string, number> = {
   Küche: 9,
   Bad: 6,
+  Badezimmer: 6, // alias for the room picker label
   Wohnzimmer: 24,
   Schlafzimmer: 14,
   Flur: 6,
   Kinderzimmer: 12,
   Arbeitszimmer: 10,
+  'Arbeitszimmer / Büro': 10, // alias for the room picker label
   Keller: 14,
   Esszimmer: 12,
 };
