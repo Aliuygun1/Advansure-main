@@ -567,11 +567,16 @@ export default function WalkPage() {
    * - Reuses an existing live stream (no repeated permission prompt).
    * - Triggers the browser permission prompt on first use.
    * - Routes to the camera-denied screen if permission is refused/unavailable.
+   *
+   * @param nextPhase  Phase to enter after permission is granted (default:
+   *                   'viewfinder'). Pass 'room-select' from the initial
+   *                   permission screen so the user picks the room type for the
+   *                   FIRST room before filming — otherwise the AI has to guess it.
    */
-  const requestCamera = useCallback(async (): Promise<boolean> => {
+  const requestCamera = useCallback(async (nextPhase: WalkPhase = 'viewfinder'): Promise<boolean> => {
     // Already granted earlier in this walk → reuse, no new prompt.
     if (hasLiveStream()) {
-      setPhase('viewfinder');
+      setPhase(nextPhase);
       return true;
     }
 
@@ -591,7 +596,7 @@ export default function WalkPage() {
         audio: false,
       });
       mediaStreamRef.current = stream;
-      setPhase('viewfinder');
+      setPhase(nextPhase);
       return true;
     } catch {
       setPhase('camera-denied');
@@ -973,7 +978,7 @@ export default function WalkPage() {
             Advansure braucht deine Kamera, damit Avery den Schaden per Video einschätzen kann.
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <button className="btn btn-primary btn-block" onClick={requestCamera}>
+            <button className="btn btn-primary btn-block" onClick={() => requestCamera('room-select')}>
               <Icon name="camera" size={20} color="var(--accent-ink)" />
               Erlauben
             </button>
@@ -1030,8 +1035,9 @@ export default function WalkPage() {
                 paddingTop: 4,
               }}
             >
-              Welchen Raum möchtest du als Nächstes aufnehmen? Wähle einen Vorschlag – oder lass
-              ihn automatisch erkennen.
+              {completedRooms.length === 0
+                ? 'Welchen Raum möchtest du aufnehmen? Wähle einen Vorschlag – oder lass ihn automatisch erkennen.'
+                : 'Welchen Raum möchtest du als Nächstes aufnehmen? Wähle einen Vorschlag – oder lass ihn automatisch erkennen.'}
             </p>
           </div>
 
